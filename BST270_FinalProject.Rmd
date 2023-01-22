@@ -1,0 +1,289 @@
+---
+title: "BST 270 Final Project"
+author: "Randy Williams"
+date: "1/18/2023"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+For my final project, I chose to reproduce the visualizations for the article, "Be Suspicious Of Online Movie Ratings, Especially Fandango’s", which was published by [FiveThirtyEight](https://fivethirtyeight.com/features/fandango-movies-ratings/). 
+I also critiqued the reproducibility of the article.
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#Loading Packages
+library(ggplot2)
+library(RColorBrewer)
+library(ggthemes)
+library(scales)
+library(grid)
+library(extrafont)
+library(remotes)
+library(stringr)
+library(dplyr)
+library(plyr)
+library(tidyverse)
+extrafont::loadfonts()
+```
+
+
+Data for every film pulled from Fandango on Aug. 24, 2015 can be downloaded from this [FiveThirtyEight GitHub repository](https://github.com/fivethirtyeight/data/tree/master/fandango) (use `fandango_scrape.csv`). 
+Data pulled on Aug. 24 2015 for every film that has a Rotten Tomatoes rating, a RT User rating, a Metacritic score, a Metacritic User score, and IMDb score, and at least 30 fan reviews on Fandango can be downloaded from the [FiveThirtyEight GitHub repository](https://github.com/fivethirtyeight/data/tree/master/fandango) (use `fandango_score_comparison.csv`).
+I uploaded the Fandago Scrape and Fandago Comparison datasets directly from FiveThirtyEight's github repository.
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#Downloading Data
+fandango_scrape<-as.data.frame(data.table::fread("https://raw.githubusercontent.com/fivethirtyeight/data/master/fandango/fandango_scrape.csv"))
+
+fandango_comp<-as.data.frame(data.table::fread("https://raw.githubusercontent.com/fivethirtyeight/data/master/fandango/fandango_score_comparison.csv"))
+```
+
+
+### Data Dictionary
+The data dictionary for each file used for the article can be found in the github repository (https://github.com/fivethirtyeight/data/tree/master/fandango). 
+
+
+## Figure 1
+
+### Data Wrangling the Fandango Scrape Data
+
+Use the Fandango Scrape data (`fandango_scrape.csv`) to create Figure 1.
+First, I reduced the list of films to ones that came out in 2015. There was no variable for movie year. Movie year was recording in the variable for film name. So, I used the grep function find films with the 2015 in the film name variable. I also had reduce the observations to films with 30 or more reviews. The author of the article stated they found 209 films. However, I found only 192 with the method that I used. I created a frequency table the number of Fandango reviewed film with a certain star count.
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+extrafont::loadfonts()
+```
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+fandango_scrape_2015 <- fandango_scrape[grep("2015", fandango_scrape$FILM),]
+fandango_scrape_2015_over30 <-fandango_scrape_2015[fandango_scrape_2015$VOTES>=30,]
+nrow(fandango_scrape_2015_over30)
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#Creating frequency tables for the number of stars.
+Stars_freq<-data.frame(table(fandango_scrape_2015_over30$STARS))
+colnames(Stars_freq)<- c("Stars","Freq")
+#calculating the proportion of movies with a certain star ratings
+Stars_freq$Prop<-Stars_freq$Freq/nrow(fandango_scrape_2015_over30)
+Stars_freq$Stars<-as.numeric(as.character(Stars_freq$Stars))
+Stars_freq
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#As shown in the article's graphs, a line was drawn from stars counts ranging from .5 to 5.
+#I'm appending the frequency table and assigning 0's to the stars counts in this range that were not observed in the data.
+Stars_freq0<-data.frame(Stars=c(.5,1,1.5,2,2.5),Freq=c(0,0,0,0,0),Prop=c(0,0,0,0,0))
+Stars_freq_2<-rbind(Stars_freq0,Stars_freq)
+```
+
+
+### Plotting Figure 1
+Despite having fewer observations, the graph I created was comparable to the original graph in the article.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+# Figure 1 plot 
+p <- ggplot(Stars_freq_2, aes(x=Stars,y=Prop)) + 
+  geom_line(colour="red",show.legend = FALSE) +
+  geom_area(aes(fill="red",alpha=.7))+
+  xlim(0,5) +
+  ylim(0,.40) +
+  annotate("text", x=3.7, y=.30, label= str_wrap("Fandango presented rating",width = 10),fontface = "bold",colour = "gray19")+
+  scale_y_continuous(labels=percent)+
+  # Adding the title
+  labs(title="Fandango's Lopsided Ratings Curve",subtitle = "Ratings for 192 films that played in theaters in 2015 and recieved 30+ recieved") +
+  # From ggthemes, making it look like 538 
+  scale_color_fivethirtyeight() +
+  #theme_fivethirtyeight improves the layout look more like 538 graph 
+  #but it only works in html outputs.
+  #theme_fivethirtyeight(base_family = "Arial")+ 
+  theme(legend.position="none")
+p
+```
+
+
+
+## Figure 2
+
+### Data Wrangling the Fandango Comparision Data
+Figure 2 was created using the Fandango Comparison dataset (`fandango_score_comparison.csv`). To create Figure 2, I also needed reduced the list of films to ones that came out in 2015. Similar to the Fandango scrape dataset, the Fandango comparison dataset had no variable for movie year. Therefore, I had to use a similar approach to filter the data to movies released in 2015. According to the article, not all the movies sold by Fandango had IMDb and Metacritics. Therefore, the number of observations was smaller for the Fandango comparison dataset compared to the Fandago scrape dataset. The author of the article claimed of have found 146 films in 2015 from the subtitle of Figure 2. However, I found only 129 films with the method that I used. I would assume that there was an error made by the author of the article because there are only 146 observations in total for the Fandago Comparison Datasets. The author would have used the whole dataset to produce Figure 2 and not all of the movies are from 2015. The dataset consists of films like "Two Days, One Night (2014)", "Into the Woods (2014)", "A Most Violent Year (2014)", "The Hobbit: The Battle of the Five Armies (2014)" and more which were released earlier than 2015.
+
+I also created a frequency table of the number of films with a certain star count for each film review site  using the Fandango comparison dataset. These frequency tables were used to construct the curves.
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+fandango_comp_2015 <- fandango_comp[grep("2015", fandango_comp$FILM),]
+fandango_comp_2015_over30 <-fandango_comp_2015[fandango_comp_2015$Fandango_votes>=30,]
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+Fig2_Stars_freq<-data.frame(table(fandango_comp_2015$Fandango_Stars))
+colnames(Fig2_Stars_freq)<- c("Stars","Freq")
+#calculating the proportion of movies with a certain star ratings
+Fig2_Stars_freq$Prop<-Fig2_Stars_freq$Freq/nrow(fandango_comp_2015_over30)
+Fig2_Stars_freq$Stars<-as.numeric(as.character(Fig2_Stars_freq$Stars))
+Fig2_Stars_freq
+```
+
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#IMDb
+IMDb_freq<-data.frame(table(fandango_comp_2015_over30$IMDB_norm_round))
+colnames(IMDb_freq)<- c("Stars","Freq")
+#calculating the proportion of movies with a certain star ratings
+IMDb_freq$Prop<-IMDb_freq$Freq/nrow(fandango_comp_2015_over30)
+IMDb_freq$Stars<-as.numeric(as.character(IMDb_freq$Stars))
+IMDb_freq
+
+#As shown in the article's graphs, a line was drawn from stars counts ranging from .5 to 5.
+#I'm appending the frequency table and assigning 0's to the stars counts in this range that were not observed in the data.
+IMDb_freq0<-data.frame(Stars=c(.5,1,1.5),Freq=c(0,0,0),Prop=c(0,0,0))
+IMDb_freq1<-data.frame(Stars=c(5),Freq=c(0),Prop=c(0))
+IMDb_freq_2<-rbind(IMDb_freq0,IMDb_freq,IMDb_freq1)
+IMDb_freq_2
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#Metacritic Users
+MetacriticUsers_freq<-data.frame(table(fandango_comp_2015_over30$Metacritic_user_norm_round))
+colnames(MetacriticUsers_freq)<- c("Stars","Freq")
+#calculating the proportion of movies with a certain star ratings
+MetacriticUsers_freq$Prop<-MetacriticUsers_freq$Freq/nrow(fandango_comp_2015_over30)
+MetacriticUsers_freq$Stars<-as.numeric(as.character(MetacriticUsers_freq$Stars))
+MetacriticUsers_freq
+
+#As shown in the article's graphs, a line was drawn from stars counts ranging from .5 to 5.
+#I'm appending the frequency table and assigning 0's to the stars counts in this range that were not observed in the data.
+MetacriticUsers_freq0<-data.frame(Stars=c(.5),Freq=c(0),Prop=c(0))
+MetacriticUsers_freq1<-data.frame(Stars=c(5),Freq=c(0),Prop=c(0))
+MetacriticUsers_freq_2<-rbind(MetacriticUsers_freq0,MetacriticUsers_freq, MetacriticUsers_freq1)
+MetacriticUsers_freq_2
+```
+
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#Metacritic
+Metacritic_freq<-data.frame(table(fandango_comp_2015_over30$Metacritic_norm_round))
+colnames(Metacritic_freq)<- c("Stars","Freq")
+#calculating the proportion of movies with a certain star ratings
+Metacritic_freq$Prop<-Metacritic_freq$Freq/nrow(fandango_comp_2015_over30)
+Metacritic_freq$Stars<-as.numeric(as.character(Metacritic_freq$Stars))
+Metacritic_freq
+
+#As shown in the article's graphs, a line was drawn from stars counts ranging from .5 to 5.
+#I'm appending the frequency table and assigning 0's to the stars counts in this range that were not observed in the data.
+Metacritic_freq1<-data.frame(Stars=c(5),Freq=c(0),Prop=c(0))
+Metacritic_freq_2<-rbind(Metacritic_freq, Metacritic_freq1)
+Metacritic_freq_2
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#Rotten Tomatoes Users
+RTusers_freq<-data.frame(table(fandango_comp_2015_over30$RT_user_norm_round))
+colnames(RTusers_freq)<- c("Stars","Freq")
+#calculating the proportion of movies with a certain star ratings
+RTusers_freq$Prop<-RTusers_freq$Freq/nrow(fandango_comp_2015_over30)
+RTusers_freq$Stars<-as.numeric(as.character(RTusers_freq$Stars))
+RTusers_freq
+
+#As shown in the article's graphs, a line was drawn from stars counts ranging from .5 to 5.
+#I'm appending the frequency table and assigning 0's to the stars counts in this range that were not observed in the data.
+RTusers_freq0<-data.frame(Stars=c(.5),Freq=c(0),Prop=c(0))
+RTusers_freq1<-data.frame(Stars=c(5),Freq=c(0),Prop=c(0))
+RTusers_freq_2<-rbind(RTusers_freq0,RTusers_freq,RTusers_freq1)
+RTusers_freq_2
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#Rotten Tomatoes
+RT_freq<-data.frame(table(fandango_comp_2015_over30$RT_norm_round))
+colnames(RT_freq)<- c("Stars","Freq")
+#calculating the proportion of movies with a certain star ratings
+RT_freq$Prop<-RT_freq$Freq/nrow(fandango_comp_2015_over30)
+RT_freq$Stars<-as.numeric(as.character(RT_freq$Stars))
+RT_freq
+
+#As shown in the article's graphs, a line was drawn from stars counts ranging from .5 to 5.
+#I'm appending the frequency table and assigning 0's to the stars counts in this range that were not observed in the data.
+RT_freq_2<-RT_freq
+RT_freq_2
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+#As shown in the article's graphs, a line was drawn from stars counts ranging from .5 to 5.
+#I'm appending the frequency table and assigning 0's to the stars counts in this range that were not observed in the data.
+Fig2_Stars_freq0<-data.frame(Stars=c(.5,1,1.5,2,2.5),Freq=c(0,0,0,0,0),Prop=c(0,0,0,0,0))
+Fig2_Stars_freq_2<-rbind(Fig2_Stars_freq0,Fig2_Stars_freq)
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results='hide',message=FALSE}
+Fig2<- ggplot(Fig2_Stars_freq_2, aes(x=Stars,y=Prop)) + 
+  geom_line(colour="red",show.legend = FALSE) +
+  geom_area(aes(fill="red",alpha=.7))+
+  xlim(0,5) +
+  ylim(0,.40) +
+  annotate("text", x=4.9, y=.375, label= str_wrap("Fandango",width = 10),fontface = "bold",colour = "red")+
+  scale_y_continuous(labels=percent)+
+  # Adding the title
+  labs(title="Fandango LOVES Movies",subtitle = str_wrap("Normalized ratings distribution of 129 films in theaters in 2015 that recieved 30+ reviews from Fandango.com")) +
+  # From ggthemes, making it look like 538 
+  scale_color_fivethirtyeight()+
+  #theme_fivethirtyeight improves the layout look more like 538 graph 
+  #but it only works in html outputs.
+  #theme_fivethirtyeight(base_family = "Arial")+ 
+  theme(legend.position="none")
+
+#Fig2
+```
+
+
+### Plotting Figure 2
+There are some differences between the graph I generated compared to the original graph. For example, the peak of the curve for Metacritic users reviews was slightly smaller than 30% in my graph, while the original graph had the peak of the curve for Metacritic users reviews was higher than 30%. This was probably because there was a difference between number of films in 2015 I found and the number films they reported in the article. Nevertheless, the shape of the curves for each category was very similar to my graph compared to the original.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+Fig2+
+  geom_area(data = IMDb_freq_2, aes(x=Stars, y=Prop),color="azure3",alpha=.2)+geom_line(data=IMDb_freq_2,aes(x=Stars, y=Prop),color="goldenrod")+
+  annotate("text", x=2.7, y=.39, label= str_wrap("IMDb users",width = 10),colour = "goldenrod")+
+  
+  geom_area(data = MetacriticUsers_freq_2, aes(x=Stars, y=Prop),color="azure3",alpha=.2)+
+  geom_line(data=MetacriticUsers_freq_2,aes(x=Stars, y=Prop),color="chartreuse3")+
+  annotate("text", x=2.5, y=.32, label= str_wrap("Metacritic users",width = 10),colour = "chartreuse3")+
+  geom_segment(mapping=aes(x=3.5, y=.3, xend=2.8, yend=.32), color="grey17")+
+  
+  geom_area(data = Metacritic_freq_2, aes(x=Stars, y=Prop),color="azure3",alpha=.2)+
+  geom_line(data=Metacritic_freq_2,aes(x=Stars, y=Prop),color="darkorchid")+
+  annotate("text", x=1.5, y=.17, label= str_wrap("Metacritic",width = 10),colour = "darkorchid")+
+  
+  geom_area(data = RTusers_freq_2, aes(x=Stars, y=Prop),color="azure3",alpha=.2)+
+  geom_line(data=RTusers_freq_2,aes(x=Stars, y=Prop),color="deepskyblue")+
+  annotate("text", x=2.5, y=.22, label= str_wrap("Rotten Tomatoes users",width = 10),colour = "deepskyblue")+
+  
+  geom_area(data = RT_freq_2, aes(x=Stars, y=Prop),color="azure3",alpha=.2)+
+  geom_line(data=RT_freq_2,aes(x=Stars, y=Prop),color="gray19")+
+  annotate("text", x=.5, y=.15, label= str_wrap("Rotten Tomatoes",width = 10),colour = "gray19")
+
+```
+
+## Final Remarks on Reproducibility
+I was able to reproduce data visualizations of curves with a similar shape. However, I wasn't able reproduce the same number of films after filtering by year due to poor reproducible data science practices when designing the data. There wasn't a separate variable created for year which made the process of looking for films in 2015 not straightforward and error prone. Furthermore, there was a strong possibility that the author made an error in the Fandango Comparison dataset because of this issue. Also, the author mentioned that he normalized the rating from other review sites to the Fandango 5 star scale and provided both the normalized ratings rounded and unrounded as variables in the dataset. However, the author failed to disclose the details on the normalization that was done or what normalization method was used.
+
+In conclusion, despite being able to reproduce similar looking graphs with the data provided, there was clear evidence of poor reproducible data science practices that were used throughout the investigation by the FiveThirtyEight article.
+
+
+
+
+
